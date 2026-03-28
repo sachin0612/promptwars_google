@@ -11,6 +11,10 @@ handlers:
 - url: /tests
   static_dir: tests
 
+- url: /(manifest\.json|sw\.js)
+  static_files: \1
+  upload: (manifest\.json|sw\.js)
+
 - url: /(.+)
   static_files: \1
   upload: (.+)

@@ -1284,3 +1284,47 @@ input[type="file"] {
 .goog-te-gadget-icon {
   display: none !important;
 }
+
+/* Guardrails UI Error */
+.conv-error {
+  flex-direction: row;
+}
+.error-avatar {
+  background: #FFEbee !important;
+  color: #D32F2F !important;
+  border-color: #ffcdd2 !important;
+}
+.error-bubble {
+  background: #FFEbee !important;
+  border: 1px solid #ffcdd2 !important;
+  color: #c62828 !important;
+}
+.error-bubble p strong { /* Bold "OUT OF SCOPE" */
+  color: #b71c1c;
+}
+
+/* Text-to-Speech Button */
+.tts-btn {
+  margin-top: 12px;
+  background: rgba(46, 125, 50, 0.1);
+  color: var(--green-700);
+  border: 1px solid rgba(46, 125, 50, 0.2);
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+  align-self: flex-start;
+}
+.tts-btn:hover {
+  background: var(--green-600);
+  color: white;
+  transform: translateY(-1px);
+}
+.tts-btn:active {
+  transform: translateY(0);
+}

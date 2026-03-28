@@ -444,6 +444,12 @@ const App = {
    * @param {string|null} imageBase64 - Optional image base64.
    */
   addToConversation(role, content, imageBase64 = null) {
+    // ---- GUARDRAILS (Hackathon Feature) ----
+    if (role === "assistant" && content.includes("[ERROR_IRRELEVANT_QUERY]")) {
+      content = "⚠️ **OUT OF SCOPE**\n\nThe Farmer Decision Engine is strictly calibrated to answer queries exclusively about agriculture, weather, crops, soils, farming schemes, and rural markets. I cannot assist with non-farming topics.";
+      role = "error";
+    }
+
     const msgEl = document.createElement("div");
     msgEl.className = `conv-message conv-${role} animate-in`;
 
@@ -469,6 +475,17 @@ const App = {
     }
 
     msgEl.innerHTML = html;
+
+    // ---- TEXT-TO-SPEECH ACCESSIBILITY (Hackathon Feature) ----
+    if (role === "assistant" && "speechSynthesis" in window) {
+      const ttsBtn = document.createElement("button");
+      ttsBtn.className = "tts-btn";
+      ttsBtn.innerHTML = "🔊 Read Aloud";
+      ttsBtn.title = "Listen to advice";
+      ttsBtn.onclick = () => this.speakText(content);
+      msgEl.appendChild(ttsBtn);
+    }
+
     this.conversationLog.appendChild(msgEl);
     
     // Scroll to bottom
@@ -494,6 +511,23 @@ const App = {
       btn.innerHTML = `<span class="eq-icon">${ex.icon}</span>${ex.text}`;
       container.appendChild(btn);
     });
+  },
+
+  // ---- TEXT-TO-SPEECH ----
+  speakText(text) {
+    if (window.speechSynthesis.speaking) {
+      window.speechSynthesis.cancel(); // Stop if already speaking
+      return;
+    }
+    // Clean markdown symbols for clearer speech
+    const cleanText = text.replace(/[*_#]/g, "").replace(/\[🎯🌤️💰🏛️🌱📋\]/g, "");
+    
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.lang = "en-IN"; // Indian English accent context
+    utterance.rate = 0.95; // Slightly slower for clarity
+    window.speechSynthesis.speak(utterance);
+    
+    this.showToast("Reading advice aloud...", "info");
   },
 
   // ---- UI HELPERS ----
