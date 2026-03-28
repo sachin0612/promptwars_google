@@ -10,6 +10,9 @@ const App = {
   toolCallsThisQuery: [],
 
   // ---- INITIALIZATION ----
+  /**
+   * Initializes the application, caches DOM elements, and binds events.
+   */
   init() {
     this.cacheDOM();
     this.bindEvents();
@@ -52,8 +55,8 @@ const App = {
     this.responseArea = document.getElementById("responseArea");
     this.welcomeState = document.getElementById("welcomeState");
     this.loadingState = document.getElementById("loadingState");
-    this.toolCallsContainer = document.getElementById("toolCalls");
-    this.resultCards = document.getElementById("resultCards");
+    // Removed toolCallsContainer and resultCards to fix UI rendering bug.
+    // They are now injected directly into the conversation log.
     this.conversationLog = document.getElementById("conversationLog");
 
     // Header
@@ -143,6 +146,9 @@ const App = {
   },
 
   // ---- FARMER PROFILE ----
+  /**
+   * Populates the state select dropdown from the embedded knowledge base.
+   */
   populateStates() {
     const states = window.FarmData.INDIAN_STATES;
     states.forEach(state => {
@@ -153,6 +159,10 @@ const App = {
     });
   },
 
+  /**
+   * Builds the context string from the farmer profile.
+   * @returns {string} The formatted farmer context string.
+   */
   getFarmerContext() {
     const state = this.stateSelect.value;
     const land = this.landSizeInput.value;
@@ -243,6 +253,9 @@ const App = {
   },
 
   // ---- QUERY SUBMISSION ----
+  /**
+   * Handles user query submission, sends to Gemini API, and orchestrates UI updates.
+   */
   async submitQuery() {
     const query = this.queryInput.value.trim();
     if (!query && !this.uploadedImageBase64) return;
@@ -284,7 +297,7 @@ const App = {
       // Update conversation history
       this.conversationHistory = result.conversationHistory;
 
-      // Render the response
+      // Render the response text (will be converted to cards inline)
       this.renderResponse(result.response, result.toolCallRounds);
 
       // Clear photo after sending
@@ -304,14 +317,18 @@ const App = {
     }
   },
 
-  // ---- TOOL CALL HANDLING ----
+  /**
+   * Captures and renders individual tool calls inside the current loading bubble.
+   * @param {Object} detail - The details of the tool call.
+   */
   handleToolCall(detail) {
     this.toolCallsThisQuery.push(detail);
     this.renderToolCall(detail);
   },
 
   renderToolCall(detail) {
-    this.toolCallsContainer.style.display = "block";
+    const container = document.getElementById("currentToolCalls");
+    if (!container) return;
     
     const toolIcons = {
       getWeather: "🌤️",
@@ -330,28 +347,25 @@ const App = {
     };
 
     const el = document.createElement("div");
-    el.className = "tool-call-item animate-in";
-    el.innerHTML = `
-      <span class="tool-icon">${toolIcons[detail.name] || "🔧"}</span>
-      <span class="tool-name">${toolNames[detail.name] || detail.name}</span>
-      <span class="tool-status">✓</span>
-    `;
-    this.toolCallsContainer.querySelector(".tool-calls-list").appendChild(el);
+    el.className = "tool-call-chip animate-in";
+    el.innerHTML = `<span>${toolIcons[detail.name] || "🔧"}</span> ${toolNames[detail.name] || detail.name} <span class="tool-status">✓</span>`;
+    container.appendChild(el);
+    
+    this.responseArea.scrollTop = this.responseArea.scrollHeight;
   },
 
   // ---- RESPONSE RENDERING ----
   renderResponse(responseText, toolRounds) {
-    // Add to conversation log
+    // We strictly use addToConversation so the UI flows sequentially
     this.addToConversation("assistant", responseText);
-
-    // Parse sections from the response
-    this.renderResultCards(responseText);
   },
 
-  renderResultCards(responseText) {
-    this.resultCards.innerHTML = "";
-    this.resultCards.style.display = "grid";
-
+  /**
+   * Parses the AI response and transforms structured sections into HTML cards.
+   * @param {string} responseText - The raw markdown text from Gemini.
+   * @returns {string} The HTML formatted string.
+   */
+  formatAsCardsHTML(responseText) {
     const sectionConfig = {
       "RECOMMENDED ACTION": { icon: "🎯", color: "green", priority: 1 },
       "WEATHER ANALYSIS": { icon: "🌤️", color: "blue", priority: 2 },
@@ -370,7 +384,6 @@ const App = {
       const title = match[1].trim();
       const content = match[2].trim();
       
-      // Find matching config
       let config = { icon: "📄", color: "gray", priority: 99 };
       for (const [key, cfg] of Object.entries(sectionConfig)) {
         if (title.toUpperCase().includes(key)) {
@@ -382,37 +395,25 @@ const App = {
       sections.push({ title, content, ...config });
     }
 
-    // If we found structured sections, render as cards
     if (sections.length > 0) {
       sections.sort((a, b) => a.priority - b.priority);
       
+      let html = '<div class="result-cards-inline">';
       sections.forEach((section, index) => {
-        const card = document.createElement("div");
-        card.className = `result-card card-${section.color}`;
-        card.style.animationDelay = `${index * 0.1}s`;
-
-        card.innerHTML = `
-          <div class="card-header">
-            <span class="card-icon">${section.icon}</span>
-            <h3 class="card-title">${this.cleanTitle(section.title)}</h3>
+        html += `
+          <div class="result-card card-${section.color}" style="animation-delay: ${index * 0.1}s">
+            <div class="card-header">
+              <span class="card-icon">${section.icon}</span>
+              <h3 class="card-title">${this.cleanTitle(section.title)}</h3>
+            </div>
+            <div class="card-content">${this.formatMarkdown(section.content)}</div>
           </div>
-          <div class="card-content">${this.formatMarkdown(section.content)}</div>
         `;
-
-        this.resultCards.appendChild(card);
       });
+      html += '</div>';
+      return html;
     } else {
-      // Fallback: render as single card
-      const card = document.createElement("div");
-      card.className = "result-card card-green full-width";
-      card.innerHTML = `
-        <div class="card-header">
-          <span class="card-icon">🌾</span>
-          <h3 class="card-title">Advisory</h3>
-        </div>
-        <div class="card-content">${this.formatMarkdown(responseText)}</div>
-      `;
-      this.resultCards.appendChild(card);
+      return this.formatMarkdown(responseText);
     }
   },
 
@@ -423,9 +424,9 @@ const App = {
   formatMarkdown(text) {
     return text
       // Bold
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*\*(.*?)\*\*/g, (match, p1) => `<strong>${this.escapeHtml(p1)}</strong>`)
       // Italic
-      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      .replace(/\*(.*?)\*/g, (match, p1) => `<em>${this.escapeHtml(p1)}</em>`)
       // Numbered lists
       .replace(/^(\d+)\.\s+(.+)$/gm, '<div class="list-item"><span class="list-num">$1</span><span>$2</span></div>')
       // Bullet lists
@@ -436,6 +437,12 @@ const App = {
   },
 
   // ---- CONVERSATION LOG ----
+  /**
+   * Appends a message to the conversation log.
+   * @param {string} role - The role of the sender ("user" | "assistant" | "error").
+   * @param {string} content - The content of the message.
+   * @param {string|null} imageBase64 - Optional image base64.
+   */
   addToConversation(role, content, imageBase64 = null) {
     const msgEl = document.createElement("div");
     msgEl.className = `conv-message conv-${role} animate-in`;
@@ -446,12 +453,16 @@ const App = {
       html += `<div class="conv-avatar user-avatar">👨‍🌾</div>`;
       html += `<div class="conv-bubble user-bubble">`;
       if (imageBase64) {
-        html += `<img src="data:image/jpeg;base64,${imageBase64}" class="conv-image" alt="Uploaded crop photo">`;
+        // Sanitize base64 (ensure no HTML tags are injected)
+        const safeBase64 = this.escapeHtml(imageBase64);
+        html += `<img src="data:image/jpeg;base64,${safeBase64}" class="conv-image" alt="Uploaded crop photo">`;
       }
       html += `<p>${this.escapeHtml(content)}</p></div>`;
     } else if (role === "assistant") {
       html += `<div class="conv-avatar ai-avatar">🌾</div>`;
-      html += `<div class="conv-bubble ai-bubble">${this.formatMarkdown(content)}</div>`;
+      // We pass content through formatAsCardsHTML which calls formatMarkdown
+      const formattedHtml = this.formatAsCardsHTML(content);
+      html += `<div class="conv-bubble ai-bubble">${formattedHtml}</div>`;
     } else if (role === "error") {
       html += `<div class="conv-avatar error-avatar">⚠️</div>`;
       html += `<div class="conv-bubble error-bubble"><p>${this.escapeHtml(content)}</p></div>`;
@@ -487,21 +498,32 @@ const App = {
 
   // ---- UI HELPERS ----
   showLoading(show) {
-    this.loadingState.style.display = show ? "flex" : "none";
+    this.loadingState.style.display = show ? "none" : "none"; // Hide standard loading
+    
     if (show) {
-      this.toolCallsContainer.style.display = "none";
-      this.toolCallsContainer.querySelector(".tool-calls-list").innerHTML = "";
-      this.resultCards.style.display = "none";
+      // Create a temporary loading bubble in the conversation view
+      const loadingEl = document.createElement("div");
+      loadingEl.className = "conv-message conv-assistant animate-in";
+      loadingEl.id = "currentLoadingBubble";
+      loadingEl.innerHTML = `
+        <div class="conv-avatar ai-avatar">🌾</div>
+        <div class="conv-bubble ai-bubble loading-bubble">
+           <div class="loading-animation"><div class="wheat-sprout"></div></div>
+           <p style="margin-top: 10px; color: var(--text-200); font-weight: 500;">Analyzing your situation...</p>
+           <div class="tool-calls-inline" id="currentToolCalls" style="margin-top: 12px; display: flex; flex-wrap: wrap; gap: 8px;"></div>
+        </div>
+      `;
+      this.conversationLog.appendChild(loadingEl);
+      this.responseArea.scrollTop = this.responseArea.scrollHeight;
+    } else {
+      const loadingEl = document.getElementById("currentLoadingBubble");
+      if (loadingEl) loadingEl.remove();
     }
   },
 
   clearConversation() {
     this.conversationHistory = [];
     this.conversationLog.innerHTML = "";
-    this.resultCards.innerHTML = "";
-    this.resultCards.style.display = "none";
-    this.toolCallsContainer.style.display = "none";
-    this.toolCallsContainer.querySelector(".tool-calls-list").innerHTML = "";
     this.welcomeState.style.display = "flex";
     this.showToast("Conversation cleared", "success");
   },
@@ -511,6 +533,9 @@ const App = {
     textarea.style.height = Math.min(textarea.scrollHeight, 200) + "px";
   },
 
+  /**
+   * Escapes HTML to prevent XSS.
+   */
   escapeHtml(text) {
     const div = document.createElement("div");
     div.textContent = text;

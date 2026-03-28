@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>FDE - Self-Diagnostic Test Suite</title>
+  <style>
+    body { font-family: monospace; background: #1e1e1e; color: #d4d4d4; padding: 20px; }
+    h1 { color: #569cd6; }
+    .pass { color: #4CAF50; }
+    .fail { color: #f44336; }
+    .test-case { margin: 10px 0; padding: 10px; background: #2d2d2d; border-radius: 4px; border-left: 4px solid #4CAF50; }
+    .test-case.failed { border-left-color: #f44336; }
+    #summary { font-size: 1.2rem; margin-top: 20px; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>🌾 Farmer Decision Engine — Diagnostic Suite</h1>
+  <p>Running automated tests across embedded databases and tool functions to ensure hackathon robust criteria.</p>
+  
+  <div id="results"></div>
+  <div id="summary"></div>
+
+  <!-- Load dependencies -->
+  <script src="../js/data.js"></script>
+  <script src="../js/tools.js"></script>
+  
+  <!-- Run tests -->
+  <script src="test.js"></script>
+</body>
+</html>

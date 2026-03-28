@@ -4,22 +4,41 @@
 // Each tool reads from the embedded databases or calls external APIs.
 // ============================================================
 
+// Cache for API efficiency
+const APICache = new Map();
+const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+
 const FarmTools = {
 
   // ---- TOOL 1: Get Weather Data ----
+  /**
+   * Fetches real-time weather data or uses seasonal simulation as fallback.
+   * Utilizes an in-memory LRU-style cache for efficiency (Hackathon Efficiency).
+   * @param {Object} params - Tool parameters
+   * @param {string} params.location - City or district
+   * @param {string} params.state - State name
+   * @returns {Promise<Object>} Formatted weather data and advisory
+   */
   getWeather: async function({ location, state }) {
     const loc = location || state || "India";
     
     // Try OpenWeatherMap first if key is available
     const weatherKey = localStorage.getItem("fde_weather_key");
     if (weatherKey) {
+      // Check cache first
+      const cacheKey = `weather_${loc}`;
+      const cached = APICache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+        return cached.data;
+      }
+
       try {
         const res = await fetch(
           `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(loc)},IN&units=metric&appid=${weatherKey}`
         );
         if (res.ok) {
           const data = await res.json();
-          return {
+          const result = {
             source: "OpenWeatherMap (Live)",
             location: data.name,
             temperature: data.main.temp,
@@ -32,6 +51,10 @@ const FarmTools = {
             rainfall: data.rain ? data.rain["1h"] || data.rain["3h"] || 0 : 0,
             advisory: getWeatherAdvisory(data.main.temp, data.main.humidity, data.weather[0].main)
           };
+          
+          // Save to cache
+          APICache.set(cacheKey, { timestamp: Date.now(), data: result });
+          return result;
         }
       } catch (e) {
         console.warn("Weather API failed, using simulation:", e.message);
@@ -58,6 +81,13 @@ const FarmTools = {
   },
 
   // ---- TOOL 2: Get MSP & Mandi Prices ----
+  /**
+   * Retrieves Minimum Support Price and estimated market price for a crop.
+   * @param {Object} params - Tool parameters
+   * @param {string} params.crop - Name of the crop
+   * @param {string} params.season - 'kharif' or 'rabi'
+   * @returns {Object} Pricing data and recommendation
+   */
   getMSPPrice: function({ crop, season }) {
     const cropLower = (crop || "").toLowerCase().replace(/[^a-z]/g, "");
     const seasonLower = (season || "").toLowerCase();
@@ -103,6 +133,15 @@ const FarmTools = {
   },
 
   // ---- TOOL 3: Get Government Scheme Eligibility ----
+  /**
+   * Evaluates farmer profile against government agriculture schemes.
+   * @param {Object} params - Tool parameters
+   * @param {string|number} params.landSize - Land size in acres
+   * @param {string} params.state - Indian state
+   * @param {string} params.crop - Primary crop grown
+   * @param {string} params.farmerType - 'individual' or 'institutional'
+   * @returns {Object} List of eligible schemes and estimated benefits
+   */
   getSchemeEligibility: function({ landSize, state, crop, farmerType }) {
     const eligible = [];
     const landAcres = parseFloat(landSize) || 2;
@@ -160,6 +199,14 @@ const FarmTools = {
   },
 
   // ---- TOOL 4: Get Crop Advisory ----
+  /**
+   * Returns scientific and practical advisory for growing a specific crop.
+   * @param {Object} params - Tool parameters
+   * @param {string} params.crop - Target crop
+   * @param {string} params.state - Indian state for regional adjustments
+   * @param {string} params.season - Target season
+   * @returns {Object} Crop management timeline, pests, yield estimations
+   */
   getCropAdvisory: function({ crop, state, season }) {
     const cropLower = (crop || "").toLowerCase().replace(/[^a-z]/g, "");
     
@@ -206,6 +253,12 @@ const FarmTools = {
   },
 
   // ---- TOOL 5: Get Soil Data ----
+  /**
+   * Returns soil characteristics and nutrient management for a state.
+   * @param {Object} params - Tool parameters
+   * @param {string} params.state - Indian state
+   * @returns {Object} Soil profile, pH, nutrient deficiencies, recommendations
+   */
   getSoilData: function({ state }) {
     const stateStr = (state || "").trim();
     

@@ -1233,3 +1233,54 @@ body {
 input[type="file"] {
   display: none;
 }
+
+/* ---- NEW HACKATHON ENHANCEMENTS ---- */
+
+/* Inline Result Cards in Conversation */
+.result-cards-inline {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin-top: 1rem;
+  width: 100%;
+}
+
+/* Tool Call Chips */
+.tool-call-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--surface-100);
+  border: 1px solid var(--border-color);
+  padding: 0.5rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  color: var(--text-200);
+  font-weight: 500;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+}
+.tool-call-chip .tool-status {
+  color: var(--green-500);
+  font-weight: bold;
+}
+
+/* Google Translate Widget Overrides */
+#google_translate_element {
+  display: inline-block;
+}
+.goog-te-gadget-simple {
+  background-color: var(--glass-bg) !important;
+  border: 1px solid var(--border-medium) !important;
+  border-radius: var(--radius-md) !important;
+  padding: 8px 12px !important;
+  font-family: var(--font-body) !important;
+  font-size: 0.85rem !important;
+  box-shadow: var(--shadow-sm) !important;
+  color: var(--text-secondary) !important;
+}
+.goog-te-gadget-simple .VIpgJd-Zvi9od-xl07Ob-lTBxed {
+  color: var(--text-secondary) !important;
+}
+.goog-te-gadget-icon {
+  display: none !important;
+}
