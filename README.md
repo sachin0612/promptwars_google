@@ -1,71 +1,107 @@
-# 🌾 Farmer Decision Engine
-
-> **From soil to strategy — one conversation.**
-
-An AI-powered agricultural decision engine that helps Indian farmers make optimal farming decisions. Describe your land, crop, and problem in natural language — the engine combines weather data, MSP/mandi prices, government scheme eligibility, and crop science to recommend the best action.
-
-**Powered by Google Gemini** with function calling for real-time data synthesis.
+<div align="center">
+  <h1>🌾 Farmer Decision Engine</h1>
+  <p><strong>From soil to strategy — one conversation.</strong></p>
+  <p>An AI-powered agricultural decision engine that helps Indian farmers make optimal farming decisions by synthesising disparate datasets into actionable, localized advice.</p>
+</div>
 
 ---
 
-## ✨ Features
+## 📖 Overview
 
-- 🧠 **Gemini-Powered Intelligence** — Natural language understanding + multi-source data synthesis via function calling
-- 🌤️ **Weather Analysis** — Live weather data (OpenWeatherMap) or seasonal simulation
-- 💰 **Market Intelligence** — Real 2025-26 MSP prices + simulated mandi prices with sell/hold recommendations
-- 🏛️ **Government Schemes** — PM-KISAN, PMFBY, e-NAM, KCC eligibility checks
-- 🌱 **Crop Advisory** — Sowing windows, water needs, pest management with chemical names & dosages for 10+ crops
-- 🗺️ **Soil Analysis** — State-wise soil type, pH, nutrient status, and suitable crop recommendations
-- 🎤 **Voice Input** — Speak your question (Web Speech API)
-- 📷 **Photo Upload** — Upload crop/leaf photos for disease diagnosis
-- 🌍 **Multilingual** — Hindi input supported natively via Gemini
-- 📱 **Mobile-First** — Responsive design optimized for farmer smartphones
+Most farming decisions require synthesising information from disconnected systems — weather forecasts, soil health, government Minimum Support Prices (MSP), scheme eligibility, and crop science. A farmer currently has to navigate all of these alone. 
 
-## 🚀 Getting Started
+The **Farmer Decision Engine** lets a farmer describe their land, crop, and problem in natural language natively, and the engine handles the synthesis. Powered by **Google Gemini**, the system autonomously queries live data and embedded agricultural databases to recommend a specific, highly tailored action plan.
 
-1. Open `index.html` in a browser (or serve with any HTTP server)
-2. Enter your [Gemini API key](https://aistudio.google.com/apikey) (free)
-3. Fill in your farmer profile (state, land, crop)
-4. Ask any farming question!
+## ✨ Core Features
 
-### Example Queries
-- *"I have 5 acres in Punjab. Should I sow wheat now?"*
-- *"Cotton leaves turning yellow in Gujarat. What's wrong?"*
-- *"What government schemes can help me? 3 acres paddy in UP"*
-- *"Wheat MSP this year? Should I sell at mandi or wait?"*
+1. 🧠 **Gemini-Powered Intelligence**
+   - Natural language understanding combined with autonomous multi-step **function calling**.
+   - The AI identifies what data it needs, triggers the appropriate tools, and synthesises the results into structured, color-coded advisory cards.
+2. 🌍 **Instant Multilingual Translation (Google Services)**
+   - Integrated **Google Translate Widget** instantly translates the interface and all generative AI responses into Hindi, Punjabi, Marathi, Tamil, Bengali, and other regional languages.
+3. 🌤️ **Live Weather Analysis**
+   - Fetches real-time weather via OpenWeatherMap (or simulated seasonal data) and provides farming-specific advisories (e.g., "Delay sowing due to frost risk"). Uses an **in-memory LRU cache** to ensure efficiency and limit API calls.
+4. 💰 **Market Intelligence**
+   - Contains real 2025-26 MSP prices and calculates simulated Mandi prices. Advises whether to sell locally or at government procurement centers.
+5. 🏛️ **Government Scheme Eligibility**
+   - Cross-references the farmer's land size and state with schemes like PM-KISAN, PMFBY, e-NAM, and KCC to automatically calculate eligibility and potential benefits.
+6. 🌱 **Crop & Soil Science**
+   - Provides scientific sowing windows, water needs, fertilizers, and pest management (with exact chemical dosages) for over 10 major Indian crops matched to state-specific soil profiles.
+7. 🎤 **Multimodal Inputs**
+   - **Voice Input:** Speak questions directly using the native Web Speech API.
+   - **Vision / Photo Upload:** Upload photos of diseased crops for instant visual diagnosis via Gemini Vision.
+8. ♿ **High-Quality UX & Accessibility**
+   - Built with an earth-toned, glassmorphism design system. Fully mobile-responsive.
+   - **Accessibility (a11y):** Screen-reader compliant with ARIA-live regions, ARIA labels, and semantic HTML.
+   - **Security:** Hardened with strict HTML sanitization and Content Security Policy (CSP) headers.
+
+---
 
 ## 🏗️ Architecture
 
-```
-Farmer Input (text/voice/photo)
-        ↓
-  Gemini Engine (intent + reasoning + function calling)
-        ↓
-  ┌─────────────┬──────────────┬───────────────┬─────────────┐
-  │ Weather API │ MSP/Mandi DB │ Govt Schemes  │ Crop Science│
-  └──────┬──────┴──────┬───────┴───────┬───────┴──────┬──────┘
-         └─────────────┴───────────────┘              │
-                        ↓                             │
-              Synthesised Action Plan ←───────────────┘
+The Farmer Decision Engine operates on a **Retrieval-Augmented Generation (RAG) + Agentic Tool Calling** architecture, deployed entirely as a low-latency static web application on **Google Cloud Platform (App Engine)**.
+
+### System Flow
+1. **Context Aggregation:** The UI collects the explicit user query, uploaded images, and the implicit farmer profile (state, crops, land size).
+2. **Intent Parsing (Gemini):** The request is sent to `gemini-2.5-flash` via the REST API equipped with strict system instructions and predefined Tool Declarations.
+3. **Autonomous Tool Execution:** 
+   - Gemini decides which data sources it needs (e.g., calling `getWeather` and `getSchemeEligibility`).
+   - The browser securely executes these local/remote functions and returns the JSON payload back to the AI.
+4. **Synthesis & Formatting:** The AI synthesises the raw data into Markdown, which the App Controller parses in real-time into a progressive UI consisting of structured dashboard cards (Target Action, Weather, Market, etc.).
+
+```mermaid
+graph TD
+    A[Farmer Input: Text/Voice/Photo] -->|Context & History| B(App Controller)
+    B -->|REST API + Tools| C{Google Gemini Engine}
+    
+    C <-->|Function Calling| D[Data Sources]
+    D --> E[(Weather API / Cache)]
+    D --> F[(2025-26 Crop DB)]
+    D --> G[(Govt Schemes DB)]
+    D --> H[(MSP & Soil DB)]
+
+    C -->|Synthesised Markdown| B
+    B -->|HTML Parser & Sanitize| I[Frontend Dashboard Cards]
 ```
 
-## 📁 File Structure
+---
 
+## 🚀 Getting Started (Local Development)
+
+### Prerequisites
+- A modern web browser.
+- A free Google Gemini API Key.
+
+### Installation
+1. Clone the repository.
+   ```bash
+   git clone https://github.com/sachin0612/promptwars_google.git
+   cd promptwars_google
+   ```
+2. Run a local web server (e.g., Python's built-in server).
+   ```bash
+   python -m http.server 8080
+   ```
+3. Open `http://localhost:8080` in your browser.
+4. Enter your Gemini API key when prompted and start asking questions!
+
+## 🧪 Testing
+
+The repository includes a self-diagnostic test suite to ensure the data layer and tool structures remain intact.
+- Navigate to `http://localhost:8080/tests/run_tests.html` in your browser to execute the unit tests.
+
+## ☁️ Deployment
+
+This project is configured for seamless deployment to **Google App Engine**.
+```bash
+gcloud app deploy app.yaml --quiet
 ```
-├── index.html          # Main entry point
-├── css/
-│   └── styles.css      # Earth-toned glassmorphism design system
-├── js/
-│   ├── data.js         # Embedded DBs (MSP, schemes, crops, soil)
-│   ├── tools.js        # Tool functions for Gemini function calling
-│   ├── gemini.js       # Gemini API integration (REST + function calling)
-│   └── app.js          # App controller (voice, photo, UI)
-└── README.md
-```
+*Note: `default_expiration: "0s"` is set in `app.yaml` to prevent aggressive edge caching, ensuring farmers always receive the latest advisory updates instantly.*
 
 ## 🛠️ Tech Stack
 
-- **Frontend**: Pure HTML, CSS, JavaScript (no frameworks)
-- **AI**: Google gemini-2.5-flash (REST API with function calling)
-- **Voice**: Web Speech API
-- **Design**: Glassmorphism, Outfit + Inter fonts, earth-toned palette
+- **Frontend Core**: Vanilla HTML5, CSS3, JavaScript (ES6+). Zero bloat.
+- **AI Brain**: Google `gemini-2.5-flash`
+- **Translation Engine**: Google Translate API
+- **Live Data**: OpenWeatherMap API
+- **Deployment & Hosting**: Google Cloud Platform (App Engine)
