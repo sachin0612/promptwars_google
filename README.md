@@ -66,6 +66,6 @@ Farmer Input (text/voice/photo)
 ## 🛠️ Tech Stack
 
 - **Frontend**: Pure HTML, CSS, JavaScript (no frameworks)
-- **AI**: Google Gemini 2.0 Flash (REST API with function calling)
+- **AI**: Google gemini-2.5-flash (REST API with function calling)
 - **Voice**: Web Speech API
 - **Design**: Glassmorphism, Outfit + Inter fonts, earth-toned palette
