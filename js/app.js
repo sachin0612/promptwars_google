@@ -106,7 +106,7 @@ const App = {
 
   // ---- API KEY MANAGEMENT ----
   checkApiKey() {
-    const key = localStorage.getItem("fde_groq_key");
+    const key = localStorage.getItem("fde_gemini_key");
     if (!key) {
       this.showApiKeyModal();
     } else {
@@ -116,7 +116,7 @@ const App = {
 
   showApiKeyModal() {
     this.apiKeyModal.classList.add("active");
-    this.apiKeyInput.value = localStorage.getItem("fde_groq_key") || "";
+    this.apiKeyInput.value = localStorage.getItem("fde_gemini_key") || "";
     this.apiKeyInput.focus();
   },
 
@@ -131,12 +131,12 @@ const App = {
       this.apiKeyError.style.display = "block";
       return;
     }
-    if (!key.startsWith("gsk_")) {
-      this.apiKeyError.textContent = "That doesn't look like a valid Groq API key (should start with 'gsk_')";
+    if (!key.startsWith("AI")) {
+      this.apiKeyError.textContent = "That doesn't look like a valid Gemini API key (should start with 'AI')";
       this.apiKeyError.style.display = "block";
       return;
     }
-    localStorage.setItem("fde_groq_key", key);
+    localStorage.setItem("fde_gemini_key", key);
     this.apiKeyError.style.display = "none";
     this.hideApiKeyModal();
     this.showToast("API key saved ✓", "success");
@@ -249,7 +249,7 @@ const App = {
     if (this.isProcessing) return;
 
     // Check API key
-    if (!localStorage.getItem("fde_groq_key")) {
+    if (!localStorage.getItem("fde_gemini_key")) {
       this.showApiKeyModal();
       return;
     }

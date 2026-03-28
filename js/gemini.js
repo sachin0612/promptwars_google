@@ -1,15 +1,15 @@
 // ============================================================
-// FARMER DECISION ENGINE — Groq API Integration (LLaMA 3.1)
-// Handles communication with Groq API using OpenAI-compatible
-// chat completions format with tool/function calling support.
+// FARMER DECISION ENGINE — Gemini API Integration
+// Handles communication with Google Gemini via REST API
+// with full function calling support (multi-turn loop).
 // ============================================================
 
-const GroqEngine = {
-  API_BASE: "https://api.groq.com/openai/v1/chat/completions",
-  MODEL: "llama-3.1-8b-instant",
+const GeminiEngine = {
+  API_BASE: "https://generativelanguage.googleapis.com/v1beta/models",
+  MODEL: "gemini-2.5-flash",
   MAX_FUNCTION_ROUNDS: 6,
 
-  // System prompt that defines the agricultural advisory persona
+  // System prompt that defines Gemini's agricultural advisory persona
   SYSTEM_PROMPT: `You are the **Farmer Decision Engine**, an expert agricultural advisor for Indian farmers. Your role is to synthesize weather, market prices, government schemes, crop science, and soil data to provide specific, actionable farming advice.
 
 ## Your Capabilities
@@ -60,70 +60,69 @@ Only include sections that are relevant to the farmer's question. For simple que
 
   // Get API key from storage
   getApiKey() {
-    return localStorage.getItem("fde_groq_key");
+    return localStorage.getItem("fde_gemini_key");
   },
 
-  // Build tools array in OpenAI format
-  getTools() {
-    return window.TOOL_DECLARATIONS.map(tool => ({
-      type: "function",
-      function: {
-        name: tool.name,
-        description: tool.description,
-        parameters: tool.parameters
-      }
-    }));
-  },
-
-  // Send a query to Groq with function calling
+  // Send a query to Gemini with function calling
   async query(userMessage, conversationHistory = [], imageBase64 = null) {
     const apiKey = this.getApiKey();
     if (!apiKey) {
       throw new Error("NO_API_KEY");
     }
 
-    // Build the messages array
-    const messages = [
-      { role: "system", content: this.SYSTEM_PROMPT }
-    ];
+    // Build the contents array
+    const contents = [];
 
     // Add conversation history
     for (const msg of conversationHistory) {
-      messages.push(msg);
+      contents.push(msg);
     }
 
-    // Build user message
-    let userContent = userMessage;
+    // Build user message parts
+    const userParts = [];
+
+    // Add image if provided
     if (imageBase64) {
-      // Groq/LLaMA text-only — describe that a photo was uploaded
-      userContent = `[The farmer has uploaded a photo of their crop/field for diagnosis]\n\n${userMessage || "Please analyze the crop issue visible in the photo and provide treatment advice."}`;
+      userParts.push({
+        inlineData: {
+          mimeType: "image/jpeg",
+          data: imageBase64
+        }
+      });
+      userParts.push({ text: userMessage || "Please analyze this crop image and identify any disease, pest, or issue. Then provide treatment advice." });
+    } else {
+      userParts.push({ text: userMessage });
     }
 
-    messages.push({ role: "user", content: userContent });
+    contents.push({ role: "user", parts: userParts });
+
+    // Build request body
+    const requestBody = {
+      system_instruction: {
+        parts: [{ text: this.SYSTEM_PROMPT }]
+      },
+      contents: contents,
+      tools: [{
+        functionDeclarations: window.TOOL_DECLARATIONS
+      }],
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 4096
+      }
+    };
 
     // Function calling loop
     let rounds = 0;
-    let currentMessages = [...messages];
+    let finalResponse = null;
 
     while (rounds < this.MAX_FUNCTION_ROUNDS) {
       rounds++;
 
-      const requestBody = {
-        model: this.MODEL,
-        messages: currentMessages,
-        tools: this.getTools(),
-        tool_choice: "auto",
-        temperature: 0.7,
-        max_completion_tokens: 4096,
-        stream: false
-      };
+      const url = `${this.API_BASE}/${this.MODEL}:generateContent?key=${apiKey}`;
 
-      const res = await fetch(this.API_BASE, {
+      const res = await fetch(url, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey}`
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(requestBody)
       });
 
@@ -134,30 +133,31 @@ Only include sections that are relevant to the farmer's question. For simple que
       }
 
       const data = await res.json();
-      const choice = data.choices?.[0];
+      const candidate = data.candidates?.[0];
 
-      if (!choice || !choice.message) {
-        throw new Error("No response from Groq");
+      if (!candidate || !candidate.content) {
+        throw new Error("No response from Gemini");
       }
 
-      const assistantMessage = choice.message;
+      const parts = candidate.content.parts || [];
 
-      // Check if the model wants to call tools
-      if (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
-        // Add the assistant's response (with tool calls) to messages
-        currentMessages.push(assistantMessage);
+      // Check if any part is a function call
+      const functionCalls = parts.filter(p => p.functionCall);
 
-        // Execute each tool call
-        for (const toolCall of assistantMessage.tool_calls) {
-          const fnName = toolCall.function.name;
-          let fnArgs = {};
-          try {
-            fnArgs = JSON.parse(toolCall.function.arguments);
-          } catch (e) {
-            fnArgs = {};
-          }
+      if (functionCalls.length > 0) {
+        // Add model's function call to conversation
+        requestBody.contents.push({
+          role: "model",
+          parts: parts
+        });
 
-          console.log(`🔧 Groq calling tool: ${fnName}(${JSON.stringify(fnArgs)})`);
+        // Execute each function call
+        const responseParts = [];
+        for (const fc of functionCalls) {
+          const fnName = fc.functionCall.name;
+          const fnArgs = fc.functionCall.args || {};
+
+          console.log(`🔧 Gemini calling tool: ${fnName}(${JSON.stringify(fnArgs)})`);
 
           // Execute the tool
           let result;
@@ -171,11 +171,11 @@ Only include sections that are relevant to the farmer's question. For simple que
             result = { error: `Tool execution failed: ${e.message}` };
           }
 
-          // Add tool result to messages
-          currentMessages.push({
-            role: "tool",
-            tool_call_id: toolCall.id,
-            content: JSON.stringify(result)
+          responseParts.push({
+            functionResponse: {
+              name: fnName,
+              response: result
+            }
           });
 
           // Dispatch event for UI to show tool calls
@@ -184,33 +184,37 @@ Only include sections that are relevant to the farmer's question. For simple que
           }));
         }
 
-        // Continue the loop — model may call more tools or give final response
+        // Add function responses back to conversation
+        requestBody.contents.push({
+          role: "user",
+          parts: responseParts
+        });
+
+        // Continue the loop — Gemini may call more functions or give final response
         continue;
       }
 
-      // No tool calls — this is the final text response
-      const finalResponse = assistantMessage.content || "I've gathered the data but had trouble synthesizing the recommendation. Please try rephrasing your question.";
-
-      // Build updated conversation history for follow-ups
-      const updatedHistory = [...conversationHistory];
-      updatedHistory.push({ role: "user", content: userContent });
-      updatedHistory.push({ role: "assistant", content: finalResponse });
-
-      return {
-        response: finalResponse,
-        conversationHistory: updatedHistory,
-        toolCallRounds: rounds - 1
-      };
+      // No function calls — this is the final text response
+      const textParts = parts.filter(p => p.text);
+      finalResponse = textParts.map(p => p.text).join("\n");
+      break;
     }
 
-    // If we exhausted all rounds
+    if (!finalResponse) {
+      finalResponse = "I've gathered the data but ran into an issue synthesizing the recommendation. Please try rephrasing your question.";
+    }
+
+    // Build updated conversation history for follow-ups
+    const updatedHistory = [...conversationHistory];
+    updatedHistory.push({ role: "user", parts: userParts });
+    updatedHistory.push({ role: "model", parts: [{ text: finalResponse }] });
+
     return {
-      response: "I've gathered extensive data but need a simpler question to provide a clear recommendation. Please try again.",
-      conversationHistory: [...conversationHistory, { role: "user", content: userContent }],
-      toolCallRounds: rounds
+      response: finalResponse,
+      conversationHistory: updatedHistory,
+      toolCallRounds: rounds - 1
     };
   }
 };
 
-// Expose as the same interface name the app expects
-window.GeminiEngine = GroqEngine;
+window.GeminiEngine = GeminiEngine;
